@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeScreenView } from '../../components/SafeScreenView';
 import { useAuth } from '../../context';
 import type { UserRole } from '../../types/realtime.types';
 
@@ -20,7 +22,7 @@ export function LoginScreen({
   onSelectRole: (role: UserRole) => void;
 }) {
   return (
-    <View style={styles.container}>
+    <SafeScreenView style={styles.container}>
       <Text style={styles.title}>Real-Time Image Sync POC</Text>
       <Text style={styles.subtitle}>Select your role to continue</Text>
       <TouchableOpacity
@@ -39,7 +41,7 @@ export function LoginScreen({
         <Text style={styles.buttonText}>Client</Text>
         <Text style={styles.hint}>View images in real time</Text>
       </TouchableOpacity>
-    </View>
+    </SafeScreenView>
   );
 }
 
@@ -62,10 +64,11 @@ export function EvaluatorLoginScreen({
     } catch {}
   };
 
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <SafeScreenView style={styles.container}>
       <Text style={styles.title}>Evaluator Login</Text>
-      <TouchableOpacity style={styles.backButton} onPress={onBack}>
+      <TouchableOpacity style={[styles.backButton, { top: Math.max(insets.top, 12) }]} onPress={onBack}>
         <Text style={styles.backButtonText}>← Back</Text>
       </TouchableOpacity>
       <View style={styles.form}>
@@ -103,7 +106,7 @@ export function EvaluatorLoginScreen({
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeScreenView>
   );
 }
 
@@ -126,10 +129,11 @@ export function ClientLoginScreen({
     } catch {}
   };
 
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <SafeScreenView style={styles.container}>
       <Text style={styles.title}>Client Login</Text>
-      <TouchableOpacity style={styles.backButton} onPress={onBack}>
+      <TouchableOpacity style={[styles.backButton, { top: Math.max(insets.top, 12) }]} onPress={onBack}>
         <Text style={styles.backButtonText}>← Back</Text>
       </TouchableOpacity>
       <View style={styles.form}>
@@ -167,7 +171,7 @@ export function ClientLoginScreen({
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeScreenView>
   );
 }
 
@@ -213,7 +217,6 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 48,
     left: 24,
   },
   backButtonText: {

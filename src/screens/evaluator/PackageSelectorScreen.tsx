@@ -3,7 +3,8 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeScreenView } from '../../components/SafeScreenView';
 import { useRealtime } from '../../context';
 import type { RealtimePackage } from '../../types/realtime.types';
 
@@ -23,34 +24,47 @@ export function PackageSelectorScreen({
   const { package: currentPackage, setPackage } = useRealtime();
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={onBack}>
-        <Text style={styles.backText}>← Logout</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Select real-time package</Text>
-      <Text style={styles.subtitle}>Compare latency and stability</Text>
-      {PACKAGES.map((p) => (
-        <TouchableOpacity
-          key={p.id}
-          style={[styles.option, currentPackage === p.id && styles.optionSelected]}
-          onPress={() => setPackage(p.id)}
-        >
-          <Text style={styles.optionText}>{p.label}</Text>
-          {currentPackage === p.id ? <Text style={styles.check}>✓</Text> : null}
+    <SafeScreenView style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backText}>← Logout</Text>
         </TouchableOpacity>
-      ))}
-      <TouchableOpacity style={styles.continueButton} onPress={onContinue}>
-        <Text style={styles.continueText}>Continue to client list</Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.title}>Select real-time package</Text>
+        <Text style={styles.subtitle}>Compare latency and stability</Text>
+        {PACKAGES.map((p) => (
+          <TouchableOpacity
+            key={p.id}
+            style={[styles.option, currentPackage === p.id && styles.optionSelected]}
+            onPress={() => setPackage(p.id)}
+          >
+            <Text style={styles.optionText}>{p.label}</Text>
+            {currentPackage === p.id ? <Text style={styles.check}>✓</Text> : null}
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity style={styles.continueButton} onPress={onContinue}>
+          <Text style={styles.continueText}>Continue to client list</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeScreenView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
     backgroundColor: '#0f0f14',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 40,
   },
   backButton: {
     marginBottom: 24,

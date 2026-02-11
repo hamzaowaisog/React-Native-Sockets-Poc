@@ -4,16 +4,17 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeScreenView } from '../../components/SafeScreenView';
 
 export function WaitingScreen() {
   return (
-    <View style={styles.container}>
+    <SafeScreenView style={styles.container}>
       <ActivityIndicator size="large" color="#3b82f6" />
       <Text style={styles.title}>Waiting for session</Text>
       <Text style={styles.subtitle}>
         An evaluator will start a session to share images with you.
       </Text>
-    </View>
+    </SafeScreenView>
   );
 }
 
@@ -23,7 +24,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#0f0f14',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
   },
   title: {
     color: '#fff',

@@ -230,7 +230,3 @@ export class WebRtcRealtimeService implements IRealtimeService {
 }
 
 export const webRtcRealtimeService = new WebRtcRealtimeService();
-</think>
-Fixing WebRTC service: create the peer connection when the client receives the offer.
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-StrReplace

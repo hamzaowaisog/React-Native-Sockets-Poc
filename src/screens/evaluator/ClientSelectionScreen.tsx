@@ -9,9 +9,9 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeScreenView } from '../../components/SafeScreenView';
 import { useSession } from '../../context';
 
 export function ClientSelectionScreen({
@@ -35,7 +35,7 @@ export function ClientSelectionScreen({
   };
 
   return (
-    <View style={styles.container}>
+    <SafeScreenView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backText}>← Logout</Text>
@@ -63,7 +63,7 @@ export function ClientSelectionScreen({
           </TouchableOpacity>
         )}
       />
-    </View>
+    </SafeScreenView>
   );
 }
 
@@ -75,7 +75,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#222',
   },

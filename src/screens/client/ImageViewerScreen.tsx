@@ -4,6 +4,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeScreenView } from '../../components/SafeScreenView';
 import { useRealtime } from '../../context';
 import { ImageViewer } from '../../components/ImageViewer';
 
@@ -36,10 +38,11 @@ export function ImageViewerScreen({
     };
   }, [service, onSessionEnd]);
 
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>
+    <SafeScreenView style={styles.container} edges={['left', 'right', 'bottom']} backgroundColor="#000">
+      <View style={[styles.badge, { top: insets.top + 8 }]}>
+        <Text style={styles.badgeText} numberOfLines={1}>
           Connected to: {evaluatorName ?? 'Evaluator'}
         </Text>
       </View>
@@ -51,7 +54,7 @@ export function ImageViewerScreen({
       ) : (
         <ImageViewer imageUrl={imageUrl} imageIndex={imageIndex} />
       )}
-    </View>
+    </SafeScreenView>
   );
 }
 
@@ -62,12 +65,12 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 48,
     left: 16,
     right: 16,
     zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 8,
     alignItems: 'center',
   },

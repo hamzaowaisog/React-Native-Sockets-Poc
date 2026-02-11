@@ -9,7 +9,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
+import { SafeScreenView } from '../../components/SafeScreenView';
 import { useSession } from '../../context';
 import { ImageController } from '../../components/ImageController';
 import { PerformanceMetrics } from '../../components/PerformanceMetrics';
@@ -56,30 +58,39 @@ export function ImageControlScreen({ onEndSession }: { onEndSession: () => void 
 
   if (!isSessionActive) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.waiting}>Starting session...</Text>
-      </View>
+      <SafeScreenView style={styles.container}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.waiting}>Starting session...</Text>
+        </View>
+      </SafeScreenView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeScreenView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.badge}>Connected to: {connectedClientName ?? 'Client'}</Text>
+        <Text style={styles.badge} numberOfLines={1}>Connected to: {connectedClientName ?? 'Client'}</Text>
         <TouchableOpacity style={styles.endButton} onPress={handleEndSession}>
           <Text style={styles.endButtonText}>End Session</Text>
         </TouchableOpacity>
       </View>
-      <ImageController
-        imageUrl={imageUrl}
-        imageIndex={currentImageIndex}
-        totalImages={IMAGE_COUNT}
-        onNext={goNext}
-        onPrev={goPrev}
-      />
-      <PerformanceMetrics metrics={getMetrics()} />
-    </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ImageController
+          imageUrl={imageUrl}
+          imageIndex={currentImageIndex}
+          totalImages={IMAGE_COUNT}
+          onNext={goNext}
+          onPrev={goPrev}
+        />
+        <PerformanceMetrics metrics={getMetrics()} />
+      </ScrollView>
+    </SafeScreenView>
   );
 }
 
@@ -88,17 +99,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f0f14',
   },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#222',
   },
   badge: {
     color: '#22c55e',
     fontSize: 14,
+    flex: 1,
+    marginRight: 8,
   },
   endButton: {
     paddingHorizontal: 16,
@@ -109,6 +128,12 @@ const styles = StyleSheet.create({
   endButtonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 24,
   },
   waiting: {
     color: '#888',

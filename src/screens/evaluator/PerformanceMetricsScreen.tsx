@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
+import { SafeScreenView } from '../../components/SafeScreenView';
 import { useSession } from '../../context';
 import { useRealtime } from '../../context';
 import { PerformanceMetrics } from '../../components/PerformanceMetrics';
@@ -26,9 +27,9 @@ export function PerformanceMetricsScreen({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeScreenView style={styles.container}>
       <Text style={styles.title}>Session Performance</Text>
-      <ScrollView style={styles.scroll}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <PerformanceMetrics metrics={m} />
       </ScrollView>
       <View style={styles.exportRow}>
@@ -42,7 +43,7 @@ export function PerformanceMetricsScreen({ onDone }: { onDone: () => void }) {
       <TouchableOpacity style={styles.button} onPress={onDone}>
         <Text style={styles.buttonText}>Back to Client List</Text>
       </TouchableOpacity>
-    </View>
+    </SafeScreenView>
   );
 }
 
@@ -50,7 +51,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f0f14',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   title: {
     fontSize: 22,
@@ -60,6 +63,9 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 16,
   },
   exportRow: {
     flexDirection: 'row',
