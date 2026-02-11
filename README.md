@@ -54,11 +54,19 @@ src/
 ## Real-Time Image Sync POC
 
 ### Roles
-- **Evaluator**: Log in → Select package (MQTT / WebRTC / Socket.io) → Select client → Control images (prev/next) → End session → View performance metrics.
-- **Client**: Log in → Select same package as evaluator → Wait for session → View images in real time (no controls). When evaluator ends session, client returns to waiting.
+- **Evaluator**: Log in → Select package (MQTT / WebRTC / Socket.io) → See **only clients using that same protocol** → Select a client → Control images (prev/next) → End session → View **real-time performance metrics** (latency, success/fail, samples).
+- **Client**: Log in → Select same package as evaluator → Wait for session → View images in real time (no controls). When the session ends, client returns to waiting; **logout button respects safe area** on all screens.
+
+### Protocol filtering
+The evaluator’s client list shows **only online clients that use the same protocol** (Socket.io, WebRTC, or MQTT) as the one selected. The client list screen displays the active protocol (e.g. “Select Client (WebRTC only)”).
+
+### Performance metrics
+Latency and message counts on the evaluator’s performance panel are updated in **real time** for all three protocols:
+- **Socket.io / MQTT**: The client sends a latency **ack** (sent/received timestamps) back to the evaluator; the evaluator records it and the panel updates (polled every second).
+- **WebRTC**: The client sends an ack over the data channel; the evaluator records it the same way.
 
 ### Backend (required)
-Start the Node server (Socket.io + mock auth). MQTT uses public broker `broker.emqx.io`; no extra server for MQTT.
+Start the Node server (Socket.io + mock auth, WebRTC signaling, and `/api/clients` filtered by protocol). MQTT uses public broker `broker.emqx.io`; no extra server for MQTT.
 
 ```bash
 cd server && npm install && npm start
@@ -89,24 +97,19 @@ yarn android
 
 ### Comparing packages
 1. Evaluator and client both select the **same** package (e.g. Socket.io).
-2. Evaluator selects a client and starts the session.
+2. Evaluator sees only clients on that protocol; select a client and start the session.
 3. Navigate images on the evaluator; client sees them in real time.
-4. End session and check the performance screen (latency, reconnections, success/fail counts).
+4. End session and check the performance screen (latency, reconnections, success/fail counts). Metrics update in real time for all protocols.
 
-**Detailed package comparison:** See [docs/PACKAGES_COMPARISON.md](docs/PACKAGES_COMPARISON.md) for how each transport (Socket.io, MQTT, WebRTC) works, what’s needed to use it, web feasibility, pros/cons, and configuration.
+**Detailed package comparison:** See [docs/PACKAGES_COMPARISON.md](docs/PACKAGES_COMPARISON.md) for how each transport (Socket.io, MQTT, WebRTC) works, latency/ack flow, what’s needed to use it, web feasibility, pros/cons, and configuration.
 
 ## 🔧 Configuration
 
-Update the WebSocket URL in `src/constants/socket.constants.ts`:
+For the Real-Time Image Sync POC, server and broker URLs are in `src/constants/config.ts`:
 
-```typescript
-export const SOCKET_CONFIG = {
-  URL: 'ws://your-server-url:port',
-  TIMEOUT: 5000,
-  RECONNECT_INTERVAL: 3000,
-  MAX_RECONNECT_ATTEMPTS: 5,
-};
-```
+- **Socket.io / WebRTC signaling**: `SOCKET_IO_URL` (e.g. `http://localhost:3001`)
+- **MQTT**: `MQTT_BROKER_URL` (e.g. `ws://broker.emqx.io:8083/mqtt`)
+- **API (auth, client list)**: `API_BASE_URL` (e.g. `http://localhost:3001`)
 
 ## 💻 Usage
 

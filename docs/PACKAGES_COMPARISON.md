@@ -24,11 +24,13 @@ This document explains how each package is used for data traveling in the POC, w
 ```
 Evaluator  ──►  Your Server  ──►  Client
    (emit)         (relay)         (receive)
+   ◄──────  image_ack (latency)  ◄──────
 ```
 
 - Evaluator sends `image_update` (imageIndex, imageUrl, sentAt) to the server.
 - Server looks up the client’s socket (from the session) and emits the same payload to that client.
 - **All data passes through the server** (no direct peer-to-peer link for this traffic).
+- **Latency metrics:** After receiving each image, the client emits `image_ack` with `{ sentAt, receivedAt }`. The server forwards this to the evaluator who has that client in session. The evaluator records latency (receivedAt − sentAt) so the performance panel shows real-time metrics.
 
 ### What you need to use it
 
@@ -88,11 +90,13 @@ Evaluator  ──►  Your Server  ──►  Client
 ```
 Evaluator  ──publish──►  MQTT Broker  ──deliver──►  Client
   (topic: realtime-sync/clients/{clientId}/image)      (subscribed to same topic)
+  ◄──subscribe──  realtime-sync/acks/{evaluatorId}  ◄──publish (sentAt, receivedAt)
 ```
 
 - Evaluator publishes to e.g. `realtime-sync/clients/client1/image` with payload `{ imageIndex, imageUrl, sentAt }`.
 - Client is subscribed to `realtime-sync/clients/client1/image` (and start/end topics).
 - **Broker** receives from evaluator and delivers to client. Your Node server is **not** involved in this data path (only for auth/HTTP if you use it).
+- **Latency metrics:** After receiving each image, the client publishes to `realtime-sync/acks/{evaluatorId}` with `{ sentAt, receivedAt }` (evaluatorId comes from the session start message). The evaluator subscribes to `realtime-sync/acks/{userId}` and records latency so the performance panel shows real-time metrics.
 
 ### What you need to use it
 
@@ -116,9 +120,10 @@ Evaluator  ──publish──►  MQTT Broker  ──deliver──►  Client
 
 - **Broker:** We use a **public broker** for POC: `ws://broker.emqx.io:8083/mqtt` (see `CONFIG.MQTT_BROKER_URL`).
 - **Topics:**  
-  - `realtime-sync/clients/{clientId}/start` — session start (payload can include evaluatorId / evaluatorName).  
+  - `realtime-sync/clients/{clientId}/start` — session start (payload includes evaluatorId, evaluatorName).  
   - `realtime-sync/clients/{clientId}/image` — image updates.  
-  - `realtime-sync/clients/{clientId}/end` — session end.
+  - `realtime-sync/clients/{clientId}/end` — session end.  
+  - `realtime-sync/acks/{evaluatorId}` — client publishes latency acks here; evaluator subscribes to receive them.
 - **QoS:** We use QoS 1 (at least once delivery) for reliability; you can tune per topic.
 - **No app server in data path:** Auth/HTTP can still be your Node server; MQTT traffic goes only to the broker.
 
@@ -156,16 +161,18 @@ Evaluator  ──publish──►  MQTT Broker  ──deliver──►  Client
 - **Signaling (via your server):**  
   Evaluator and client connect to your **Socket.io server** and exchange:
   - SDP offer (evaluator → server → client)
-  - SDP answer (client → server → evaluator)
-  - ICE candidates (both ways via server)
+  - SDP answer (client → server → evaluator) — the evaluator must call `setRemoteDescription(answer)` when it receives the answer so the peer connection can complete.
+  - ICE candidates (both ways via server). Candidates that arrive before the remote SDP is set are buffered and applied after `setRemoteDescription` (trickle ICE).
 - **Data (direct P2P):**  
-  Once the peer connection is established, image updates are sent over the **RTCDataChannel** from evaluator to client with **no server in the path**.
+  Once the peer connection is established, image updates are sent over the **RTCDataChannel** from evaluator to client with **no server in the path**. The client sends a `ready` message when its data channel opens; the evaluator may send the current image in response. The client replies with an ack `{ type: 'ack', sentAt, receivedAt }` so the evaluator can record latency.
 
 ```
 Signaling:  Evaluator ◄──► Socket.io Server ◄──► Client
 Data:       Evaluator ═══════════════════════════ Client
                          (direct P2P)
 ```
+
+- **Implementation (react-native-webrtc):** The data channel uses the EventTarget-style API (`addEventListener` / `removeEventListener` for `open`, `message`, `close`) where available, with a fallback to `onopen` / `onmessage` / `onclose` for compatibility.
 
 ### What you need to use it
 
@@ -187,9 +194,9 @@ Data:       Evaluator ═══════════════════�
 
 ### Configuration (this POC)
 
-- **Signaling:** Socket.io server (same as Socket.io transport). Events: `webrtc_signal` with `{ targetUserId, signal }` (signal = SDP or ICE candidate).
+- **Signaling:** Socket.io server (same as Socket.io transport). Events: `webrtc_signal` with `{ targetUserId, signal }` (signal = SDP offer/answer or ICE candidate). The evaluator handles both `offer` (client only) and `answer` (evaluator only); ICE candidates are buffered until the remote description is set.
 - **STUN:** `{ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }` in `WebRtcService.ts`. No TURN in POC.
-- **Data channel:** Single channel, label `image-sync`, ordered. Messages are JSON: `{ imageIndex, imageUrl, sentAt }`.
+- **Data channel:** Single channel, label `image-sync`, ordered. Messages: image payload `{ imageIndex, imageUrl, sentAt }`; client acks with `{ type: 'ack', sentAt, receivedAt }` for latency; client may send `{ type: 'ready' }` when channel opens to request the current image.
 
 ### Pros
 
@@ -225,14 +232,20 @@ Data:       Evaluator ═══════════════════�
 | **Latency** | Higher (server hop) | Broker hop | Lowest (direct) |
 | **Scalability (server)** | Limited by server traffic | Server not in data path | Server only for signaling |
 | **Setup complexity** | Low | Medium (broker + topics) | Higher (signaling + ICE) |
+| **Evaluator latency metrics** | Yes (client sends `image_ack`, server forwards) | Yes (client publishes to acks topic) | Yes (client acks over data channel) |
 | **Best for** | Central control, simple stack | Decoupled, many clients/topics | Low latency, P2P, privacy |
 
 ---
 
 ## Summary
 
-- **Socket.io:** Easiest to run (one server), data always via server; works on web and React Native; good when you want one backend to own the real-time flow.
-- **MQTT:** Needs a broker; data goes through the broker, not your app server; works on web (WebSocket) and RN; good for many clients/topics and decoupled design.
-- **WebRTC:** Data is peer-to-peer; server only for signaling; works on web (native API) and RN (react-native-webrtc); best for latency and server load, at the cost of signaling and optional TURN setup.
+- **Socket.io:** Easiest to run (one server), data always via server; client sends `image_ack` so evaluator sees real-time latency; works on web and React Native; good when you want one backend to own the real-time flow.
+- **MQTT:** Needs a broker; data goes through the broker, not your app server; client publishes to `realtime-sync/acks/{evaluatorId}` so evaluator sees real-time latency; works on web (WebSocket) and RN; good for many clients/topics and decoupled design.
+- **WebRTC:** Data is peer-to-peer; server only for signaling; client acks over the data channel so evaluator sees real-time latency; evaluator must handle SDP answer and buffer ICE candidates; works on web (native API) and RN (react-native-webrtc); best for latency and server load, at the cost of signaling and optional TURN setup.
 
 All three are **feasible for web**; the main differences are where the data travels, what infrastructure you run, and how much complexity you accept for lower latency and better scalability.
+
+### POC-specific behaviour
+
+- **Protocol filtering:** The evaluator’s client list (HTTP `GET /api/clients?package=...`) returns only online clients that registered with the same protocol (socketio, webrtc, or mqtt). The UI shows the active protocol (e.g. “Select Client (WebRTC only)”).
+- **Performance metrics:** For all three protocols, the evaluator’s performance panel (last/avg/min/max latency, sample count, success/failed) is updated in real time because the client sends acks (Socket.io: `image_ack`; MQTT: acks topic; WebRTC: ack over data channel). The session context polls metrics every second while a session is active.
