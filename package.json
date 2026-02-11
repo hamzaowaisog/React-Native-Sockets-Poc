@@ -4,6 +4,7 @@
   "description": "React Native WebSocket POC with TypeScript",
   "main": "index.js",
   "scripts": {
+    "server": "node server/index.js",
     "start": "react-native start",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -16,10 +17,17 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@react-native/new-app-screen": "0.81.6",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/native-stack": "^7.2.1",
+    "mqtt": "^5.15.0",
     "react": "19.1.4",
     "react-native": "0.81.6",
-    "@react-native/new-app-screen": "0.81.6",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-fast-image": "^8.6.3",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-screens": "^4.10.0",
+    "react-native-webrtc": "^124.0.7",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

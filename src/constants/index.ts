@@ -1,2 +1,3 @@
-// Export all constants
 export * from './socket.constants';
+export * from './config';
+export * from './images';

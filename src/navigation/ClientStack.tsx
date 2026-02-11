@@ -1,0 +1,71 @@
+/**
+ * Client flow: package selector -> waiting for session -> image viewer
+ */
+
+import React, { useEffect } from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { PackageSelectorScreen } from '../screens/evaluator/PackageSelectorScreen';
+import { WaitingScreen } from '../screens/client/WaitingScreen';
+import { ImageViewerScreen } from '../screens/client/ImageViewerScreen';
+import { useRealtime } from '../context';
+import { useAuth } from '../context';
+
+export type ClientStackParamList = {
+  PackageSelector: undefined;
+  Waiting: undefined;
+  ImageViewer: { evaluatorName: string };
+};
+
+const Stack = createNativeStackNavigator<ClientStackParamList>();
+
+export function ClientStack({ connected }: { connected: boolean }) {
+  return (
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0f0f14' } }}
+    >
+      <Stack.Screen name="PackageSelector" component={ClientPackageSelectorWrapper} />
+      <Stack.Screen name="Waiting" component={WaitingWrapper} />
+      <Stack.Screen name="ImageViewer" component={ImageViewerWrapper} />
+    </Stack.Navigator>
+  );
+}
+
+function ClientPackageSelectorWrapper({ navigation }: any) {
+  const { logout } = useAuth();
+  return (
+    <PackageSelectorScreen
+      onBack={logout}
+      onContinue={() => navigation.navigate('Waiting')}
+    />
+  );
+}
+
+function WaitingWrapper({ navigation }: any) {
+  const { service } = useRealtime();
+  useEffect(() => {
+    const onStart = (evaluatorName: string) => {
+      navigation.navigate('ImageViewer', { evaluatorName });
+    };
+    service.onSessionStart(onStart);
+    return () => {
+      service.onSessionStart(() => {});
+    };
+  }, [service, navigation]);
+  return <WaitingScreen />;
+}
+
+function ImageViewerWrapper({ navigation, route }: any) {
+  const evaluatorName = route.params?.evaluatorName ?? null;
+  const { service } = useRealtime();
+  useEffect(() => {
+    const onEnd = () => navigation.navigate('Waiting');
+    service.onSessionEnd(onEnd);
+    return () => service.onSessionEnd(() => {});
+  }, [service, navigation]);
+  return (
+    <ImageViewerScreen
+      evaluatorName={evaluatorName}
+      onSessionEnd={() => navigation.navigate('Waiting')}
+    />
+  );
+}

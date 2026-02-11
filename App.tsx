@@ -1,25 +1,20 @@
 import React from 'react';
-import { StatusBar, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { SocketExample } from './src/components';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider, RealtimeProvider, SessionProvider } from './src/context';
+import { RootNavigator } from './src/navigation';
 
-/**
- * Main App Component
- * Entry point for the React Native WebSocket POC
- */
-const App: React.FC = () => {
+export default function App() {
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <SocketExample />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <StatusBar barStyle="light-content" backgroundColor="#0f0f14" />
+      <AuthProvider>
+        <RealtimeProvider>
+          <SessionProvider>
+            <RootNavigator />
+          </SessionProvider>
+        </RealtimeProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
+}

@@ -1,6 +1,6 @@
-# React Native WebSocket POC
+# React Native Sockets POC
 
-A well-structured React Native WebSocket Proof of Concept with TypeScript, featuring a modular architecture for real-time communication.
+A React Native Proof of Concept for **real-time image sync** between evaluators and clients, comparing three transports: **MQTT**, **WebRTC**, and **Socket.io**.
 
 ## 📁 Project Structure
 
@@ -51,21 +51,49 @@ src/
 - ✅ User join notifications
 - ✅ Clean, Material Design-inspired UI
 
-## 📦 Installation
+## Real-Time Image Sync POC
+
+### Roles
+- **Evaluator**: Log in → Select package (MQTT / WebRTC / Socket.io) → Select client → Control images (prev/next) → End session → View performance metrics.
+- **Client**: Log in → Select same package as evaluator → Wait for session → View images in real time (no controls). When evaluator ends session, client returns to waiting.
+
+### Backend (required)
+Start the Node server (Socket.io + mock auth). MQTT uses public broker `broker.emqx.io`; no extra server for MQTT.
 
 ```bash
-# Install dependencies
-npm install
-
-# For iOS
-cd ios && pod install && cd ..
-
-# Run on iOS
-npm run ios
-
-# Run on Android
-npm run android
+cd server && npm install && npm start
+# Server runs at http://localhost:3001
 ```
+
+### Running the app
+Use the same machine or set `src/constants/config.ts` (or env) so the app can reach the server:
+- **iOS Simulator**: `localhost:3001` is fine.
+- **Android Emulator**: use `http://10.0.2.2:3001` (or your machine’s IP).
+- **Physical device**: use your machine’s LAN IP (e.g. `http://192.168.1.x:3001`).
+
+```bash
+# Install app deps
+yarn install
+
+# iOS
+cd ios && pod install && cd ..
+yarn ios
+
+# Android
+yarn android
+```
+
+### Mock credentials
+- **Evaluator**: `evaluator1` / `eval1` or `evaluator2` / `eval2`
+- **Client**: `client1` / `client1` or `client2` / `client2`
+
+### Comparing packages
+1. Evaluator and client both select the **same** package (e.g. Socket.io).
+2. Evaluator selects a client and starts the session.
+3. Navigate images on the evaluator; client sees them in real time.
+4. End session and check the performance screen (latency, reconnections, success/fail counts).
+
+**Detailed package comparison:** See [docs/PACKAGES_COMPARISON.md](docs/PACKAGES_COMPARISON.md) for how each transport (Socket.io, MQTT, WebRTC) works, what’s needed to use it, web feasibility, pros/cons, and configuration.
 
 ## 🔧 Configuration
 
