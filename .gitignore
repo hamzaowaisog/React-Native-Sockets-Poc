@@ -1,8 +1,11 @@
 # Dependencies
 node_modules/
+.npm
+.yarn-integrity
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Build artifacts
 dist/
@@ -12,6 +15,8 @@ build/
 # React Native
 .expo/
 .expo-shared/
+.metro-health-check*
+*.tsbuildinfo
 
 # iOS
 ios/build/
@@ -37,9 +42,14 @@ project.xcworkspace
 android/build/
 android/.gradle/
 android/app/build/
+android/local.properties
+android/.cxx/
+android/captures/
 *.apk
 *.ap_
 *.aab
+*.keystore
+*.jks
 
 # Local env files
 .env
@@ -49,12 +59,14 @@ android/app/build/
 # Editor directories and files
 .vscode/
 .idea/
+.cursor/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 .DS_Store
+.eslintcache
 
 # Testing
 coverage/
@@ -63,5 +75,6 @@ coverage/
 *.log
 *.tmp
 *.temp
+*.orig
 tmp/
 temp/

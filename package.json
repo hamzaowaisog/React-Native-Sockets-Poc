@@ -7,16 +7,41 @@
     "start": "react-native start",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
+    "ios:dual": "npm run ios:device1 & npm run ios:device2",
+    "ios:device1": "react-native run-ios --simulator='iPhone 15 Pro'",
+    "ios:device2": "react-native run-ios --simulator='iPhone 15'",
+    "ios:list": "xcrun simctl list devices available",
     "test": "jest",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write ."
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-native": "^0.72.0"
+    "react": "19.1.4",
+    "react-native": "0.81.6",
+    "@react-native/new-app-screen": "0.81.6",
+    "react-native-safe-area-context": "^5.5.2"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-native": "^0.72.0",
-    "typescript": "^5.0.0"
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.0.0",
+    "@react-native-community/cli-platform-android": "20.0.0",
+    "@react-native-community/cli-platform-ios": "20.0.0",
+    "@react-native/babel-preset": "0.81.6",
+    "@react-native/eslint-config": "0.81.6",
+    "@react-native/metro-config": "0.81.6",
+    "@react-native/typescript-config": "0.81.6",
+    "@types/jest": "^29.5.13",
+    "@types/react": "^19.1.4",
+    "@types/react-test-renderer": "^19.1.0",
+    "eslint": "^8.19.0",
+    "jest": "^29.6.3",
+    "prettier": "2.8.8",
+    "react-test-renderer": "19.1.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
