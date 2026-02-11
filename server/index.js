@@ -30,10 +30,13 @@ const USERS = {
   client2: { id: 'client2', name: 'Client Two', role: 'client', password: 'client2' },
 };
 
-const socketToUser = new Map(); // socketId -> { userId, role }
-const onlineClients = new Set(); // userId (clients only)
+const socketToUser = new Map(); // socketId -> { userId, role, package }
+const onlineClients = new Set(); // userId (clients only, Socket.io)
 const onlineEvaluators = new Set(); // userId (evaluators only)
 const evaluatorSessions = new Map(); // evaluatorId -> { clientId, sessionId, clientSocketId }
+// HTTP presence for MQTT (and any) clients that don't use Socket.io
+const presenceMap = new Map(); // userId -> { package, lastSeen }
+const PRESENCE_TTL_MS = 35000;
 
 // --- Auth ---
 app.post('/api/auth/login', (req, res) => {
@@ -45,22 +48,66 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ user: { id: user.id, name: user.name, role: user.role }, token: `mock-${user.id}` });
 });
 
-app.get('/api/clients', (_req, res) => {
-  const list = Array.from(onlineClients).map((id) => {
-    const u = USERS[id];
-    return { id: u?.id || id, name: u?.name || id, online: true };
-  });
+// Clients report presence (used by MQTT clients that don't have a Socket.io connection)
+app.post('/api/presence', (req, res) => {
+  const { userId, package: pkg } = req.body || {};
+  if (!userId || !pkg) return res.status(400).json({ error: 'userId and package required' });
+  const user = USERS[userId];
+  if (!user || user.role !== 'client') return res.status(400).json({ error: 'Invalid client' });
+  presenceMap.set(userId, { package: pkg, lastSeen: Date.now() });
+  res.json({ ok: true });
+});
+
+// Only return clients that are online AND using the SAME protocol (package) as requested.
+// Evaluator must pass ?package=socketio|mqtt|webrtc - only those clients are returned.
+app.get('/api/clients', (req, res) => {
+  const rawPkg = req.query.package;
+  if (rawPkg == null || rawPkg === '') {
+    return res.json({ clients: [] });
+  }
+  const normalizedPkg = normalizePackage(rawPkg);
+  if (!VALID_PACKAGES.includes(normalizedPkg)) {
+    return res.json({ clients: [] });
+  }
+  const now = Date.now();
+  const list = [];
+  // From Socket.io: only clients that registered with this exact package
+  const sockets = io.sockets.sockets ? Array.from(io.sockets.sockets.values()) : [];
+  for (const socket of sockets) {
+    if (socket.role !== 'client') continue;
+    if (normalizePackage(socket.package) !== normalizedPkg) continue;
+    const u = USERS[socket.userId];
+    list.push({ id: socket.userId, name: u?.name || socket.userId, online: true });
+  }
+  // From HTTP presence: only same package and seen recently (MQTT clients)
+  const seen = new Set(list.map((c) => c.id));
+  for (const [userId, entry] of presenceMap.entries()) {
+    if (seen.has(userId)) continue;
+    if (normalizePackage(entry.package) !== normalizedPkg || now - entry.lastSeen > PRESENCE_TTL_MS) continue;
+    const u = USERS[userId];
+    if (u && u.role === 'client') {
+      list.push({ id: userId, name: u.name || userId, online: true });
+      seen.add(userId);
+    }
+  }
   res.json({ clients: list });
 });
+
+const VALID_PACKAGES = ['socketio', 'mqtt', 'webrtc'];
+function normalizePackage(pkg) {
+  const s = String(pkg || 'socketio').toLowerCase();
+  return VALID_PACKAGES.includes(s) ? s : 'socketio';
+}
 
 // --- Socket.io events ---
 io.on('connection', (socket) => {
   socket.on('register', (payload) => {
-    const { userId, role } = payload || {};
+    const { userId, role, package: pkg } = payload || {};
     if (!userId || !role) return;
     socket.userId = userId;
     socket.role = role;
-    socketToUser.set(socket.id, { userId, role });
+    socket.package = normalizePackage(pkg);
+    socketToUser.set(socket.id, { userId, role, package: socket.package });
     if (role === 'client') {
       onlineClients.add(userId);
       io.emit('clients_updated', { clients: Array.from(onlineClients) });
@@ -76,7 +123,7 @@ io.on('connection', (socket) => {
     if (!clientId || !evaluatorId) return;
     const sessionId = `sess_${evaluatorId}_${clientId}_${Date.now()}`;
     const clientSockets = Array.from(io.sockets.sockets.values()).filter(
-      (s) => s.userId === clientId && s.role === 'client'
+      (s) => s.userId === clientId && s.role === 'client' && s.package === socket.package
     );
     const clientSocketId = clientSockets[0]?.id || null;
     evaluatorSessions.set(evaluatorId, { clientId, sessionId, clientSocketId });
@@ -98,6 +145,21 @@ io.on('connection', (socket) => {
       imageUrl,
       sentAt: sentAt || Date.now(),
     });
+  });
+
+  // Client: latency ack (client sends after receiving image_update; server forwards to evaluator)
+  socket.on('image_ack', (payload) => {
+    const { sentAt, receivedAt } = payload || {};
+    if (sentAt == null || receivedAt == null) return;
+    const clientId = socket.userId;
+    const sockets = Array.from(io.sockets.sockets.values());
+    for (const [evaluatorId, session] of evaluatorSessions.entries()) {
+      if (session.clientId === clientId) {
+        const evaluatorSocket = sockets.find((s) => s.userId === evaluatorId && s.role === 'evaluator');
+        if (evaluatorSocket) evaluatorSocket.emit('image_ack', { sentAt, receivedAt });
+        break;
+      }
+    }
   });
 
   // Evaluator: end session

@@ -2,8 +2,10 @@
  * RealtimeService interface - shared contract for MQTT, WebRTC, Socket.io
  */
 
-import type { LatencyMetrics, UserRole } from '../../types/realtime.types';
+import type { UserRole } from '../../types/realtime.types';
+import type { LatencyMetrics } from '../../types/realtime.types';
 
+export type { LatencyMetrics };
 export interface IRealtimeService {
   connect(userId: string, role: UserRole): Promise<void>;
   disconnect(): Promise<void>;

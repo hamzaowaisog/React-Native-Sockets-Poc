@@ -38,7 +38,7 @@ export class SocketIoRealtimeService implements IRealtimeService {
         reconnectionDelay: 1000,
       });
       this.socket.on('connect', () => {
-        this.socket?.emit('register', { userId, role });
+        this.socket?.emit('register', { userId, role, package: 'socketio' });
         resolve();
       });
       this.socket.on('connect_error', (err) => reject(err));
@@ -48,6 +48,15 @@ export class SocketIoRealtimeService implements IRealtimeService {
         this.recordLatency(latency);
         this.metrics.successfulMessages++;
         this.imageUpdateCallbacks.forEach((cb) => cb(payload.imageIndex, payload.imageUrl));
+        // Client sends ack so evaluator can record latency for the performance panel
+        if (payload.sentAt != null) {
+          this.socket?.emit('image_ack', { sentAt: payload.sentAt, receivedAt });
+        }
+      });
+      this.socket.on('image_ack', (payload: { sentAt?: number; receivedAt?: number }) => {
+        if (this.role === 'evaluator' && payload.sentAt != null && payload.receivedAt != null) {
+          this.recordLatency(payload.receivedAt - payload.sentAt);
+        }
       });
       this.socket.on('session_started', (payload: { evaluatorName?: string; sessionId?: string } = {}) => {
         if (payload.evaluatorName !== undefined) {
@@ -61,7 +70,7 @@ export class SocketIoRealtimeService implements IRealtimeService {
       });
       this.socket.on('reconnect', () => {
         this.metrics.reconnectionAttempts++;
-        if (this.userId && this.role) this.socket?.emit('register', { userId: this.userId, role: this.role });
+        if (this.userId && this.role) this.socket?.emit('register', { userId: this.userId, role: this.role, package: 'socketio' });
       });
     });
   }
@@ -80,10 +89,20 @@ export class SocketIoRealtimeService implements IRealtimeService {
   }
 
   async startSession(clientId: string): Promise<void> {
-    if (!this.socket?.connected || this.role !== 'evaluator') return;
+    if (this.role !== 'evaluator') return;
     this.clientId = clientId;
+    // If not connected, resolve anyway so UI shows session screen (user can retry or see connection issue)
+    if (!this.socket?.connected) {
+      return;
+    }
     return new Promise((resolve) => {
+      const timeoutMs = 8000;
+      const timeoutId = setTimeout(() => {
+        this.socket?.off('session_started', onStarted);
+        resolve();
+      }, timeoutMs);
       const onStarted = (payload: { sessionId?: string }) => {
+        clearTimeout(timeoutId);
         this.sessionId = payload?.sessionId || null;
         this.socket?.off('session_started', onStarted);
         resolve();

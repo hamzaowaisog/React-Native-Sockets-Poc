@@ -3,12 +3,22 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SafeScreenView } from '../../components/SafeScreenView';
 
-export function WaitingScreen() {
+export function WaitingScreen({ onLogout }: { onLogout?: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
     <SafeScreenView style={styles.container}>
+      {onLogout ? (
+        <TouchableOpacity
+          style={[styles.logoutButton, { top: insets.top + 16 }]}
+          onPress={onLogout}
+        >
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      ) : null}
       <ActivityIndicator size="large" color="#3b82f6" />
       <Text style={styles.title}>Waiting for session</Text>
       <Text style={styles.subtitle}>
@@ -38,5 +48,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+  },
+  logoutButton: {
+    position: 'absolute',
+    right: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    zIndex: 10,
+  },
+  logoutText: {
+    color: '#3b82f6',
+    fontSize: 16,
   },
 });

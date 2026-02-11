@@ -34,9 +34,19 @@ export async function login(credentials: LoginCredentials): Promise<AuthResult> 
   return res.json();
 }
 
-export async function fetchClients(): Promise<{ id: string; name: string; online: boolean }[]> {
-  const res = await fetch(`${CONFIG.API_BASE_URL}/api/clients`);
+export async function fetchClients(packageName: string): Promise<{ id: string; name: string; online: boolean }[]> {
+  const pkg = packageName && ['socketio', 'mqtt', 'webrtc'].includes(packageName) ? packageName : 'socketio';
+  const res = await fetch(`${CONFIG.API_BASE_URL}/api/clients?package=${encodeURIComponent(pkg)}`);
   if (!res.ok) throw new Error('Failed to fetch clients');
   const data = await res.json();
   return data.clients || [];
+}
+
+export async function reportPresence(userId: string, packageName: string): Promise<void> {
+  const res = await fetch(`${CONFIG.API_BASE_URL}/api/presence`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, package: packageName }),
+  });
+  if (!res.ok) throw new Error('Failed to report presence');
 }

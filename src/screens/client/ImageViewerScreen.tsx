@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SafeScreenView } from '../../components/SafeScreenView';
 import { useRealtime } from '../../context';
@@ -12,9 +12,11 @@ import { ImageViewer } from '../../components/ImageViewer';
 export function ImageViewerScreen({
   evaluatorName,
   onSessionEnd,
+  onLogout,
 }: {
   evaluatorName: string | null;
   onSessionEnd: () => void;
+  onLogout?: () => void;
 }) {
   const { service } = useRealtime();
   const [imageIndex, setImageIndex] = useState(0);
@@ -41,10 +43,17 @@ export function ImageViewerScreen({
   const insets = useSafeAreaInsets();
   return (
     <SafeScreenView style={styles.container} edges={['left', 'right', 'bottom']} backgroundColor="#000">
-      <View style={[styles.badge, { top: insets.top + 8 }]}>
-        <Text style={styles.badgeText} numberOfLines={1}>
-          Connected to: {evaluatorName ?? 'Evaluator'}
-        </Text>
+      <View style={[styles.badgeRow, { top: insets.top + 8 }]}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText} numberOfLines={1}>
+            Connected to: {evaluatorName ?? 'Evaluator'}
+          </Text>
+        </View>
+        {onLogout ? (
+          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       {loading && !imageUrl ? (
         <View style={styles.centered}>
@@ -63,19 +72,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  badge: {
+  badgeRow: {
     position: 'absolute',
     left: 16,
     right: 16,
     zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  badge: {
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
     alignItems: 'center',
+    marginRight: 8,
   },
   badgeText: {
     color: '#22c55e',
+    fontSize: 14,
+  },
+  logoutButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  logoutText: {
+    color: '#93c5fd',
     fontSize: 14,
   },
   centered: {

@@ -2,7 +2,7 @@
  * Evaluator: image navigation, send updates to client, end session
  */
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeScreenView } from '../../components/SafeScreenView';
-import { useSession } from '../../context';
+import { useSession, useRealtime } from '../../context';
 import { ImageController } from '../../components/ImageController';
 import { PerformanceMetrics } from '../../components/PerformanceMetrics';
 import { IMAGE_DATASET, IMAGE_COUNT } from '../../constants/images';
@@ -27,8 +27,10 @@ export function ImageControlScreen({ onEndSession }: { onEndSession: () => void 
     endSession,
     connectedClientName,
     isSessionActive,
+    metrics,
     getMetrics,
   } = useSession();
+  const { package: currentPackage } = useRealtime();
 
   const image = IMAGE_DATASET[currentImageIndex];
   const imageUrl = image?.url ?? currentImageUrl;
@@ -38,6 +40,25 @@ export function ImageControlScreen({ onEndSession }: { onEndSession: () => void 
       sendImageUpdate(currentImageIndex, imageUrl);
     }
   }, [currentImageIndex, imageUrl, isSessionActive, sendImageUpdate]);
+
+  // WebRTC: data channel can open after a delay; re-send current image so client gets it
+  const retryCount = useRef(0);
+  useEffect(() => {
+    if (!isSessionActive || currentPackage !== 'webrtc' || !imageUrl) return;
+    const maxRetries = 2;
+    const delays = [1200, 2800];
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    delays.forEach((delay, i) => {
+      const t = setTimeout(() => {
+        if (retryCount.current <= maxRetries) {
+          sendImageUpdate(currentImageIndex, imageUrl);
+          retryCount.current += 1;
+        }
+      }, delay);
+      timeouts.push(t);
+    });
+    return () => timeouts.forEach(clearTimeout);
+  }, [isSessionActive, currentPackage, imageUrl, currentImageIndex, sendImageUpdate]);
 
   const goNext = useCallback(() => {
     const next = Math.min(currentImageIndex + 1, IMAGE_COUNT - 1);
@@ -88,7 +109,7 @@ export function ImageControlScreen({ onEndSession }: { onEndSession: () => void 
           onNext={goNext}
           onPrev={goPrev}
         />
-        <PerformanceMetrics metrics={getMetrics()} />
+        <PerformanceMetrics metrics={metrics ?? getMetrics()} />
       </ScrollView>
     </SafeScreenView>
   );

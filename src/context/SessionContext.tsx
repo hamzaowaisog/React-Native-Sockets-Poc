@@ -34,22 +34,11 @@ interface SessionContextValue extends SessionState {
   getMetrics: () => LatencyMetrics;
 }
 
-const defaultMetrics: LatencyMetrics = {
-  lastLatencyMs: 0,
-  avgLatencyMs: 0,
-  minLatencyMs: Infinity,
-  maxLatencyMs: 0,
-  sampleCount: 0,
-  reconnectionAttempts: 0,
-  failedMessages: 0,
-  successfulMessages: 0,
-};
-
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const { service } = useRealtime();
+  const { service, package: currentPackage } = useRealtime();
   const [currentImageIndex, setCurrentImageIndexState] = useState(0);
   const [currentImageUrl, setCurrentImageUrlState] = useState<string | null>(null);
   const [connectedClientId, setConnectedClientId] = useState<string | null>(null);
@@ -69,22 +58,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const refreshClients = useCallback(async () => {
     if (user?.role !== 'evaluator') return;
     try {
-      const list = await AuthService.fetchClients();
+      const list = await AuthService.fetchClients(currentPackage);
       setClients(list);
     } catch {
       setClients([]);
     }
-  }, [user?.role]);
+  }, [user?.role, currentPackage]);
 
   const startSession = useCallback(
     async (clientId: string) => {
       if (user?.role !== 'evaluator') return;
-      await service.startSession(clientId);
-      const client = clients.find((c) => c.id === clientId);
-      setConnectedClientId(clientId);
-      setConnectedClientName(client?.name ?? clientId);
-      setIsSessionActive(true);
-      setMetrics(service.getLatencyMetrics());
+      try {
+        await service.startSession(clientId);
+      } finally {
+        const client = clients.find((c) => c.id === clientId);
+        setConnectedClientId(clientId);
+        setConnectedClientName(client?.name ?? clientId);
+        setIsSessionActive(true);
+        setMetrics(service.getLatencyMetrics());
+      }
     },
     [user?.role, service, clients]
   );
@@ -126,6 +118,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       service.onSessionEnd(() => {});
     };
   }, [service]);
+
+  // Poll metrics while session is active so performance tab updates (e.g. WebRTC acks)
+  useEffect(() => {
+    if (!isSessionActive) return;
+    const interval = setInterval(() => {
+      setMetrics({ ...service.getLatencyMetrics() });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isSessionActive, service]);
 
   const value: SessionContextValue = {
     currentImageIndex,

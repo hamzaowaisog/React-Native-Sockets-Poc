@@ -22,11 +22,17 @@ function clientTopic(clientId: string, suffix: string): string {
   return `${TOPIC_PREFIX}/clients/${clientId}/${suffix}`;
 }
 
+function evaluatorAckTopic(evaluatorId: string): string {
+  return `${TOPIC_PREFIX}/acks/${evaluatorId}`;
+}
+
 export class MqttRealtimeService implements IRealtimeService {
   private client: MqttClient | null = null;
   private userId: string = '';
   private role: UserRole | null = null;
   private currentClientId: string | null = null;
+  /** Client: evaluator we're in session with (for sending latency acks) */
+  private currentEvaluatorId: string | null = null;
   private metrics = createDefaultLatencyMetrics();
   private imageUpdateCallbacks: Set<ImageUpdateCallback> = new Set();
   private sessionStartCallbacks: Set<SessionStartCallback> = new Set();
@@ -55,6 +61,7 @@ export class MqttRealtimeService implements IRealtimeService {
           try {
             const msg = JSON.parse(payload.toString());
             if (topic.endsWith('/start')) {
+              this.currentEvaluatorId = msg.evaluatorId ?? null;
               this.sessionStartCallbacks.forEach((cb) => cb(msg.evaluatorName ?? 'Evaluator'));
             } else if (topic.endsWith('/image')) {
               const receivedAt = Date.now();
@@ -62,12 +69,33 @@ export class MqttRealtimeService implements IRealtimeService {
               this.recordLatency(latency);
               this.metrics.successfulMessages++;
               this.imageUpdateCallbacks.forEach((cb) => cb(msg.imageIndex, msg.imageUrl));
+              if (this.currentEvaluatorId != null && msg.sentAt != null) {
+                this.client?.publish(
+                  evaluatorAckTopic(this.currentEvaluatorId),
+                  JSON.stringify({ sentAt: msg.sentAt, receivedAt }),
+                  { qos: 0 }
+                );
+              }
             } else if (topic.endsWith('/end')) {
-              this.currentClientId = null;
+              this.currentEvaluatorId = null;
               this.sessionEndCallbacks.forEach((cb) => cb());
             }
           } catch {
             this.metrics.failedMessages++;
+          }
+        });
+      } else if (role === 'evaluator') {
+        const ackTopic = evaluatorAckTopic(userId);
+        this.client.subscribe(ackTopic, () => {});
+        this.client.on('message', (topic, payload) => {
+          if (topic !== ackTopic) return;
+          try {
+            const msg = JSON.parse(payload.toString());
+            if (typeof msg.sentAt === 'number' && typeof msg.receivedAt === 'number') {
+              this.recordLatency(msg.receivedAt - msg.sentAt);
+            }
+          } catch {
+            // ignore
           }
         });
       }
@@ -80,6 +108,7 @@ export class MqttRealtimeService implements IRealtimeService {
       this.client = null;
     }
     this.currentClientId = null;
+    this.currentEvaluatorId = null;
     this.imageUpdateCallbacks.clear();
     this.sessionStartCallbacks.clear();
     this.sessionEndCallbacks.clear();

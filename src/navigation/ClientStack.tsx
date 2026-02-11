@@ -7,8 +7,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { PackageSelectorScreen } from '../screens/evaluator/PackageSelectorScreen';
 import { WaitingScreen } from '../screens/client/WaitingScreen';
 import { ImageViewerScreen } from '../screens/client/ImageViewerScreen';
-import { useRealtime } from '../context';
-import { useAuth } from '../context';
+import { useRealtime, useAuth } from '../context';
+import * as AuthService from '../services/auth/AuthService';
 
 export type ClientStackParamList = {
   PackageSelector: undefined;
@@ -41,7 +41,9 @@ function ClientPackageSelectorWrapper({ navigation }: any) {
 }
 
 function WaitingWrapper({ navigation }: any) {
-  const { service } = useRealtime();
+  const { service, package: pkg } = useRealtime();
+  const { user, logout } = useAuth();
+
   useEffect(() => {
     const onStart = (evaluatorName: string) => {
       navigation.navigate('ImageViewer', { evaluatorName });
@@ -51,12 +53,23 @@ function WaitingWrapper({ navigation }: any) {
       service.onSessionStart(() => {});
     };
   }, [service, navigation]);
-  return <WaitingScreen />;
+
+  // MQTT clients don't use Socket.io; report presence via HTTP so evaluator sees them
+  useEffect(() => {
+    if (user?.role !== 'client' || pkg !== 'mqtt') return;
+    const send = () => AuthService.reportPresence(user!.id, 'mqtt').catch(() => {});
+    send();
+    const interval = setInterval(send, 10000);
+    return () => clearInterval(interval);
+  }, [user?.id, user?.role, pkg]);
+
+  return <WaitingScreen onLogout={logout} />;
 }
 
 function ImageViewerWrapper({ navigation, route }: any) {
   const evaluatorName = route.params?.evaluatorName ?? null;
   const { service } = useRealtime();
+  const { logout } = useAuth();
   useEffect(() => {
     const onEnd = () => navigation.navigate('Waiting');
     service.onSessionEnd(onEnd);
@@ -66,6 +79,7 @@ function ImageViewerWrapper({ navigation, route }: any) {
     <ImageViewerScreen
       evaluatorName={evaluatorName}
       onSessionEnd={() => navigation.navigate('Waiting')}
+      onLogout={logout}
     />
   );
 }

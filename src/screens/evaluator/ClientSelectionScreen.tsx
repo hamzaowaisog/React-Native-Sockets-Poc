@@ -12,7 +12,13 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeScreenView } from '../../components/SafeScreenView';
-import { useSession } from '../../context';
+import { useSession, useRealtime } from '../../context';
+
+const PROTOCOL_LABEL: Record<string, string> = {
+  socketio: 'Socket.IO',
+  webrtc: 'WebRTC',
+  mqtt: 'MQTT',
+};
 
 export function ClientSelectionScreen({
   onSelectClient,
@@ -22,6 +28,7 @@ export function ClientSelectionScreen({
   onBack: () => void;
 }) {
   const { clients, refreshClients } = useSession();
+  const { package: currentPackage } = useRealtime();
   const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
@@ -34,13 +41,18 @@ export function ClientSelectionScreen({
     setRefreshing(false);
   };
 
+  const protocolLabel = PROTOCOL_LABEL[currentPackage] ?? currentPackage;
+
   return (
     <SafeScreenView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backText}>← Logout</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Select Client</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Select Client</Text>
+          <Text style={styles.protocolLabel}>({protocolLabel} only)</Text>
+        </View>
       </View>
       <FlatList
         data={clients}
@@ -85,10 +97,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginRight: 16,
   },
+  titleRow: {
+    flex: 1,
+  },
   title: {
     color: '#fff',
     fontSize: 20,
     fontWeight: '600',
+  },
+  protocolLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 2,
   },
   row: {
     flexDirection: 'row',
