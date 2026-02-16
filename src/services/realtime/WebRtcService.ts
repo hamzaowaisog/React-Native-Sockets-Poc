@@ -17,7 +17,7 @@ import { CONFIG } from '../../constants/config';
 
 type RTCDataChannelLike = ReturnType<RTCPeerConnection['createDataChannel']>;
 
-type ImageUpdateCallback = (imageIndex: number, imageUrl: string) => void;
+type ImageUpdateCallback = (imageIndex: number, imageUrl: string, signedUrl?: string) => void;
 type SessionStartCallback = (evaluatorName: string) => void;
 type SessionEndCallback = () => void;
 
@@ -36,7 +36,7 @@ export class WebRtcRealtimeService implements IRealtimeService {
   private sessionEndCallbacks: Set<SessionEndCallback> = new Set();
   private signalingResolve: (() => void) | null = null;
   /** Evaluator: last image to send; sent when data channel opens so client gets current image */
-  private pendingImage: { imageIndex: number; imageUrl: string } | null = null;
+  private pendingImage: { imageIndex: number; imageUrl: string; signedUrl?: string } | null = null;
   /** Client: buffer ICE candidates until setRemoteDescription has completed */
   private pendingIceCandidates: any[] = [];
   private dataChannelListeners: { channel: RTCDataChannelLike; open: () => void; close: () => void; message: (e: { data: string | ArrayBuffer | Blob }) => void } | null = null;
@@ -59,9 +59,11 @@ export class WebRtcRealtimeService implements IRealtimeService {
         this.handleSignal(payload.fromUserId, payload.signal);
       });
       this.socket.on('session_ended', () => this.handleSessionEnd());
-      this.socket.on('session_started', (payload: { evaluatorId?: string; evaluatorName?: string }) => {
+      this.socket.on('session_started', (payload: { evaluatorId?: string; evaluatorName?: string; sessionId?: string }) => {
         this.remoteUserId = payload?.evaluatorId || null;
-        this.sessionStartCallbacks.forEach((cb) => cb(payload?.evaluatorName ?? 'Evaluator'));
+        this.sessionStartCallbacks.forEach((cb) =>
+          cb(payload?.evaluatorName ?? 'Evaluator', payload?.evaluatorId, payload?.sessionId)
+        );
       });
       this.socket.on('reconnect', () => {
         this.metrics.reconnectionAttempts++;
@@ -132,7 +134,7 @@ export class WebRtcRealtimeService implements IRealtimeService {
       this.signalingResolve?.();
       this.signalingResolve = null;
       if (this.pendingImage) {
-        this.sendImageUpdate(this.pendingImage.imageIndex, this.pendingImage.imageUrl);
+        this.sendImageUpdate(this.pendingImage.imageIndex, this.pendingImage.imageUrl, this.pendingImage.signedUrl);
       }
     };
     const onClose = () => this.handleSessionEnd();
@@ -148,6 +150,7 @@ export class WebRtcRealtimeService implements IRealtimeService {
           this.dataChannel.send(JSON.stringify({
             imageIndex: this.pendingImage.imageIndex,
             imageUrl: this.pendingImage.imageUrl,
+            signedUrl: this.pendingImage.signedUrl,
             sentAt: Date.now(),
           }));
           this.metrics.successfulMessages++;
@@ -176,7 +179,7 @@ export class WebRtcRealtimeService implements IRealtimeService {
         const msg = JSON.parse(str);
         if (msg.imageIndex !== undefined && msg.imageUrl !== undefined) {
           this.metrics.successfulMessages++;
-          this.imageUpdateCallbacks.forEach((cb) => cb(msg.imageIndex, msg.imageUrl));
+          this.imageUpdateCallbacks.forEach((cb) => cb(msg.imageIndex, msg.imageUrl, msg.signedUrl));
           if (this.dataChannel?.readyState === 'open' && typeof msg.sentAt === 'number') {
             this.dataChannel.send(JSON.stringify({ type: 'ack', sentAt: msg.sentAt, receivedAt: Date.now() }));
           }
@@ -297,8 +300,8 @@ export class WebRtcRealtimeService implements IRealtimeService {
     this.socket?.emit('webrtc_signal', { targetUserId, signal });
   }
 
-  async sendImageUpdate(imageIndex: number, imageUrl: string): Promise<void> {
-    this.pendingImage = { imageIndex, imageUrl };
+  async sendImageUpdate(imageIndex: number, imageUrl: string, signedUrl?: string): Promise<void> {
+    this.pendingImage = { imageIndex, imageUrl, signedUrl };
     if (this.role !== 'evaluator' || !this.dataChannel) {
       this.metrics.failedMessages++;
       return;
@@ -308,7 +311,7 @@ export class WebRtcRealtimeService implements IRealtimeService {
     }
     try {
       const sentAt = Date.now();
-      this.dataChannel.send(JSON.stringify({ imageIndex, imageUrl, sentAt }));
+      this.dataChannel.send(JSON.stringify({ imageIndex, imageUrl, signedUrl: signedUrl ?? undefined, sentAt }));
       this.metrics.successfulMessages++;
     } catch {
       this.metrics.failedMessages++;

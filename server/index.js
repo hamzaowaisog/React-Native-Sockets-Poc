@@ -5,9 +5,16 @@
  */
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const { Server } = require('socket.io');
 const cors = require('cors');
+
+const RECORDINGS_DIR = path.join(__dirname, '..', 'recordings');
+if (!fs.existsSync(RECORDINGS_DIR)) {
+  fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+}
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -20,7 +27,7 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // --- Mock auth & registry ---
 const USERS = {
@@ -37,6 +44,8 @@ const evaluatorSessions = new Map(); // evaluatorId -> { clientId, sessionId, cl
 // HTTP presence for MQTT (and any) clients that don't use Socket.io
 const presenceMap = new Map(); // userId -> { package, lastSeen }
 const PRESENCE_TTL_MS = 35000;
+// One segment per image per client: key = evaluatorId_clientId_imageIndex (avoids duplicates/data loss)
+const storedSegmentsByKey = new Map(); // key -> { sessionId, evaluatorId, clientId, imageIndex, signedUrl, audioBase64, receivedAt }
 
 // --- Auth ---
 app.post('/api/auth/login', (req, res) => {
@@ -56,6 +65,64 @@ app.post('/api/presence', (req, res) => {
   if (!user || user.role !== 'client') return res.status(400).json({ error: 'Invalid client' });
   presenceMap.set(userId, { package: pkg, lastSeen: Date.now() });
   res.json({ ok: true });
+});
+
+// Client submits segment (previous image ref + audio) when evaluator sends next image. One segment per image per client.
+app.post('/api/session/segment', (req, res) => {
+  const { sessionId, evaluatorId, clientId, imageIndex, signedUrl, audioBase64 } = req.body || {};
+  if (signedUrl == null && !audioBase64) {
+    return res.status(400).json({ error: 'signedUrl or audioBase64 required' });
+  }
+  const segment = {
+    sessionId: sessionId || null,
+    evaluatorId: evaluatorId || null,
+    clientId: clientId || null,
+    imageIndex: imageIndex != null ? imageIndex : null,
+    signedUrl: signedUrl || null,
+    audioBase64: audioBase64 || null,
+    receivedAt: Date.now(),
+  };
+  const key = `${segment.evaluatorId ?? 'e'}_${segment.clientId ?? 'c'}_${segment.imageIndex}`;
+  const isUpdate = storedSegmentsByKey.has(key);
+  storedSegmentsByKey.set(key, segment);
+
+  if (segment.audioBase64) {
+    try {
+      const ext = 'm4a';
+      const filename = `segment_image_${segment.imageIndex}_${segment.clientId || 'unknown'}.${ext}`;
+      const filePath = path.join(RECORDINGS_DIR, filename);
+      fs.writeFileSync(filePath, Buffer.from(segment.audioBase64, 'base64'));
+      console.log('[segment] saved audio to', filename, isUpdate ? '(overwrite)' : '');
+    } catch (err) {
+      console.warn('[segment] failed to save audio file', err.message);
+    }
+  }
+
+  console.log('[segment]', {
+    key,
+    imageIndex: segment.imageIndex,
+    signedUrl: segment.signedUrl ? `${segment.signedUrl.slice(0, 40)}...` : null,
+    hasAudio: !!segment.audioBase64,
+    clientId: segment.clientId,
+    evaluatorId: segment.evaluatorId,
+    ...(isUpdate && { overwrote: true }),
+  });
+  res.json({ ok: true, segmentId: key });
+});
+
+// Optional: list stored segments (one per image per client; for debugging / POC)
+app.get('/api/session/segments', (req, res) => {
+  const segments = Array.from(storedSegmentsByKey.entries()).map(([key, s]) => ({
+    id: key,
+    sessionId: s.sessionId,
+    evaluatorId: s.evaluatorId,
+    clientId: s.clientId,
+    imageIndex: s.imageIndex,
+    signedUrl: s.signedUrl,
+    hasAudio: !!s.audioBase64,
+    receivedAt: s.receivedAt,
+  }));
+  res.json({ segments });
 });
 
 // Only return clients that are online AND using the SAME protocol (package) as requested.
@@ -135,14 +202,15 @@ io.on('connection', (socket) => {
     socket.emit('session_started', { sessionId, clientId });
   });
 
-  // Evaluator: send image update
+  // Evaluator: send image update (Socket.io path; WebRTC sends image over data channel)
   socket.on('image_update', (payload) => {
-    const { imageIndex, imageUrl, sentAt } = payload || {};
+    const { imageIndex, imageUrl, signedUrl, sentAt } = payload || {};
     const session = evaluatorSessions.get(socket.userId);
     if (!session?.clientSocketId) return;
     io.to(session.clientSocketId).emit('image_update', {
       imageIndex,
       imageUrl,
+      signedUrl: signedUrl || undefined,
       sentAt: sentAt || Date.now(),
     });
   });

@@ -23,12 +23,12 @@ export interface RealtimeService {
 
   // Evaluator methods
   startSession(clientId: string): Promise<void>;
-  sendImageUpdate(imageIndex: number, imageUrl: string): Promise<void>;
+  sendImageUpdate(imageIndex: number, imageUrl: string, signedUrl?: string): Promise<void>;
   endSession(): Promise<void>;
 
   // Client methods
-  onImageUpdate(callback: (imageIndex: number, imageUrl: string) => void): void;
-  onSessionStart(callback: (evaluatorName: string) => void): void;
+  onImageUpdate(callback: (imageIndex: number, imageUrl: string, signedUrl?: string) => void): void;
+  onSessionStart(callback: (evaluatorName: string, evaluatorId?: string, sessionId?: string) => void): void;
   onSessionEnd(callback: () => void): void;
 
   // Performance tracking
@@ -45,4 +45,6 @@ export interface SessionInfo {
 export interface ImageItem {
   id: number;
   url: string;
+  /** Signed URL for later storage/upload (e.g. S3 presigned); sent over P2P with image */
+  signedUrl?: string;
 }

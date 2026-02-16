@@ -37,9 +37,9 @@ export function ImageControlScreen({ onEndSession }: { onEndSession: () => void 
 
   useEffect(() => {
     if (imageUrl && isSessionActive) {
-      sendImageUpdate(currentImageIndex, imageUrl);
+      sendImageUpdate(currentImageIndex, imageUrl, image?.signedUrl);
     }
-  }, [currentImageIndex, imageUrl, isSessionActive, sendImageUpdate]);
+  }, [currentImageIndex, imageUrl, image?.signedUrl, isSessionActive, sendImageUpdate]);
 
   // WebRTC: data channel can open after a delay; re-send current image so client gets it
   const retryCount = useRef(0);
@@ -51,7 +51,7 @@ export function ImageControlScreen({ onEndSession }: { onEndSession: () => void 
     delays.forEach((delay, i) => {
       const t = setTimeout(() => {
         if (retryCount.current <= maxRetries) {
-          sendImageUpdate(currentImageIndex, imageUrl);
+          sendImageUpdate(currentImageIndex, imageUrl, image?.signedUrl);
           retryCount.current += 1;
         }
       }, delay);

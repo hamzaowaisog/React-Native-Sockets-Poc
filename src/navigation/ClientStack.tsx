@@ -13,7 +13,7 @@ import * as AuthService from '../services/auth/AuthService';
 export type ClientStackParamList = {
   PackageSelector: undefined;
   Waiting: undefined;
-  ImageViewer: { evaluatorName: string };
+  ImageViewer: { evaluatorName: string; evaluatorId?: string; sessionId?: string };
 };
 
 const Stack = createNativeStackNavigator<ClientStackParamList>();
@@ -45,8 +45,8 @@ function WaitingWrapper({ navigation }: any) {
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    const onStart = (evaluatorName: string) => {
-      navigation.navigate('ImageViewer', { evaluatorName });
+    const onStart = (evaluatorName: string, evaluatorId?: string, sessionId?: string) => {
+      navigation.navigate('ImageViewer', { evaluatorName, evaluatorId, sessionId });
     };
     service.onSessionStart(onStart);
     return () => {
@@ -68,6 +68,8 @@ function WaitingWrapper({ navigation }: any) {
 
 function ImageViewerWrapper({ navigation, route }: any) {
   const evaluatorName = route.params?.evaluatorName ?? null;
+  const evaluatorId = route.params?.evaluatorId ?? null;
+  const sessionId = route.params?.sessionId ?? null;
   const { service } = useRealtime();
   const { logout } = useAuth();
   useEffect(() => {
@@ -78,6 +80,8 @@ function ImageViewerWrapper({ navigation, route }: any) {
   return (
     <ImageViewerScreen
       evaluatorName={evaluatorName}
+      evaluatorId={evaluatorId}
+      sessionId={sessionId}
       onSessionEnd={() => navigation.navigate('Waiting')}
       onLogout={logout}
     />

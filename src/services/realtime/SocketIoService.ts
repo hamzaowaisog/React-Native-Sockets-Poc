@@ -11,7 +11,7 @@ import {
 import type { UserRole } from '../../types/realtime.types';
 import { CONFIG } from '../../constants/config';
 
-type ImageUpdateCallback = (imageIndex: number, imageUrl: string) => void;
+type ImageUpdateCallback = (imageIndex: number, imageUrl: string, signedUrl?: string) => void;
 type SessionStartCallback = (evaluatorName: string) => void;
 type SessionEndCallback = () => void;
 
@@ -42,12 +42,12 @@ export class SocketIoRealtimeService implements IRealtimeService {
         resolve();
       });
       this.socket.on('connect_error', (err) => reject(err));
-      this.socket.on('image_update', (payload: { imageIndex: number; imageUrl: string; sentAt?: number }) => {
+      this.socket.on('image_update', (payload: { imageIndex: number; imageUrl: string; signedUrl?: string; sentAt?: number }) => {
         const receivedAt = Date.now();
         const latency = payload.sentAt ? receivedAt - payload.sentAt : 0;
         this.recordLatency(latency);
         this.metrics.successfulMessages++;
-        this.imageUpdateCallbacks.forEach((cb) => cb(payload.imageIndex, payload.imageUrl));
+        this.imageUpdateCallbacks.forEach((cb) => cb(payload.imageIndex, payload.imageUrl, payload.signedUrl));
         // Client sends ack so evaluator can record latency for the performance panel
         if (payload.sentAt != null) {
           this.socket?.emit('image_ack', { sentAt: payload.sentAt, receivedAt });
@@ -58,9 +58,11 @@ export class SocketIoRealtimeService implements IRealtimeService {
           this.recordLatency(payload.receivedAt - payload.sentAt);
         }
       });
-      this.socket.on('session_started', (payload: { evaluatorName?: string; sessionId?: string } = {}) => {
-        if (payload.evaluatorName !== undefined) {
-          this.sessionStartCallbacks.forEach((cb) => cb(payload.evaluatorName ?? 'Evaluator'));
+      this.socket.on('session_started', (payload: { evaluatorName?: string; evaluatorId?: string; sessionId?: string } = {}) => {
+        if (payload.evaluatorName !== undefined || payload.evaluatorId !== undefined) {
+          this.sessionStartCallbacks.forEach((cb) =>
+            cb(payload.evaluatorName ?? 'Evaluator', payload.evaluatorId, payload.sessionId)
+          );
         }
       });
       this.socket.on('session_ended', () => {
@@ -112,13 +114,13 @@ export class SocketIoRealtimeService implements IRealtimeService {
     });
   }
 
-  async sendImageUpdate(imageIndex: number, imageUrl: string): Promise<void> {
+  async sendImageUpdate(imageIndex: number, imageUrl: string, signedUrl?: string): Promise<void> {
     if (!this.socket?.connected || this.role !== 'evaluator') {
       this.metrics.failedMessages++;
       return;
     }
     const sentAt = Date.now();
-    this.socket.emit('image_update', { imageIndex, imageUrl, sentAt });
+    this.socket.emit('image_update', { imageIndex, imageUrl, signedUrl: signedUrl ?? undefined, sentAt });
     this.metrics.successfulMessages++;
   }
 

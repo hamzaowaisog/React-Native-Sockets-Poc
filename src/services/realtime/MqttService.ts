@@ -12,7 +12,7 @@ import {
 import type { UserRole } from '../../types/realtime.types';
 import { CONFIG } from '../../constants/config';
 
-type ImageUpdateCallback = (imageIndex: number, imageUrl: string) => void;
+type ImageUpdateCallback = (imageIndex: number, imageUrl: string, signedUrl?: string) => void;
 type SessionStartCallback = (evaluatorName: string) => void;
 type SessionEndCallback = () => void;
 
@@ -62,13 +62,15 @@ export class MqttRealtimeService implements IRealtimeService {
             const msg = JSON.parse(payload.toString());
             if (topic.endsWith('/start')) {
               this.currentEvaluatorId = msg.evaluatorId ?? null;
-              this.sessionStartCallbacks.forEach((cb) => cb(msg.evaluatorName ?? 'Evaluator'));
+              this.sessionStartCallbacks.forEach((cb) =>
+                cb(msg.evaluatorName ?? 'Evaluator', msg.evaluatorId, msg.sessionId)
+              );
             } else if (topic.endsWith('/image')) {
               const receivedAt = Date.now();
               const latency = msg.sentAt ? receivedAt - msg.sentAt : 0;
               this.recordLatency(latency);
               this.metrics.successfulMessages++;
-              this.imageUpdateCallbacks.forEach((cb) => cb(msg.imageIndex, msg.imageUrl));
+              this.imageUpdateCallbacks.forEach((cb) => cb(msg.imageIndex, msg.imageUrl, msg.signedUrl));
               if (this.currentEvaluatorId != null && msg.sentAt != null) {
                 this.client?.publish(
                   evaluatorAckTopic(this.currentEvaluatorId),
@@ -125,7 +127,7 @@ export class MqttRealtimeService implements IRealtimeService {
     );
   }
 
-  async sendImageUpdate(imageIndex: number, imageUrl: string): Promise<void> {
+  async sendImageUpdate(imageIndex: number, imageUrl: string, signedUrl?: string): Promise<void> {
     if (!this.client?.connected || this.role !== 'evaluator' || !this.currentClientId) {
       this.metrics.failedMessages++;
       return;
@@ -134,7 +136,7 @@ export class MqttRealtimeService implements IRealtimeService {
     const topic = clientTopic(this.currentClientId, 'image');
     this.client.publish(
       topic,
-      JSON.stringify({ imageIndex, imageUrl, sentAt }),
+      JSON.stringify({ imageIndex, imageUrl, signedUrl: signedUrl ?? undefined, sentAt }),
       { qos: 1 }
     );
     this.metrics.successfulMessages++;

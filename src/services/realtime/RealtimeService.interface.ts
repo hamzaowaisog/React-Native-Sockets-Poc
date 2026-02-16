@@ -11,11 +11,11 @@ export interface IRealtimeService {
   disconnect(): Promise<void>;
 
   startSession(clientId: string): Promise<void>;
-  sendImageUpdate(imageIndex: number, imageUrl: string): Promise<void>;
+  sendImageUpdate(imageIndex: number, imageUrl: string, signedUrl?: string): Promise<void>;
   endSession(): Promise<void>;
 
-  onImageUpdate(callback: (imageIndex: number, imageUrl: string) => void): void;
-  onSessionStart(callback: (evaluatorName: string) => void): void;
+  onImageUpdate(callback: (imageIndex: number, imageUrl: string, signedUrl?: string) => void): void;
+  onSessionStart(callback: (evaluatorName: string, evaluatorId?: string, sessionId?: string) => void): void;
   onSessionEnd(callback: () => void): void;
 
   getLatencyMetrics(): LatencyMetrics;

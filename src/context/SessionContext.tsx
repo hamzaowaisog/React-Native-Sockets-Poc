@@ -30,7 +30,7 @@ interface SessionContextValue extends SessionState {
   refreshClients: () => Promise<void>;
   startSession: (clientId: string) => Promise<void>;
   endSession: () => Promise<void>;
-  sendImageUpdate: (imageIndex: number, imageUrl: string) => Promise<void>;
+  sendImageUpdate: (imageIndex: number, imageUrl: string, signedUrl?: string) => Promise<void>;
   getMetrics: () => LatencyMetrics;
 }
 
@@ -90,8 +90,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [service]);
 
   const sendImageUpdate = useCallback(
-    async (imageIndex: number, imageUrl: string) => {
-      await service.sendImageUpdate(imageIndex, imageUrl);
+    async (imageIndex: number, imageUrl: string, signedUrl?: string) => {
+      await service.sendImageUpdate(imageIndex, imageUrl, signedUrl);
       setMetrics(service.getLatencyMetrics());
     },
     [service]

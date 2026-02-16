@@ -78,3 +78,7 @@ coverage/
 *.orig
 tmp/
 temp/
+
+# Server-saved audio segments (remove to commit for testing)
+recordings/*.m4a
+recordings/*.webm
